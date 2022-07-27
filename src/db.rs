@@ -34,66 +34,31 @@ pub struct User {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct PlayerItem {
-    /// Name of the song.
+pub struct PDFItem {
+    /// Name of the request.
     pub name: String,
-    /// Artists of the song.
+    /// RUT requested.
     #[serde(default)]
-    pub artists: Option<String>,
-    /// The URL of a track.
-    pub track_url: String,
+    pub rut: Option<String>,
+    /// The URL of a pdf.
+    pub pdf_url: String,
     /// User who requested the song.
     #[serde(default)]
     pub user: Option<String>,
-    /// Length of the song.
-    pub duration: String,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Player {
-    pub current: Option<PlayerItem>,
-    pub items: Vec<PlayerItem>,
+pub struct Requester {
+    pub current: Option<RequesterItem>,
+    pub items: Vec<RequesterItem>,
     #[serde(default)]
     pub last_update: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PlayerEntry {
+pub struct RequesterEntry {
     pub user_login: String,
     pub last_update: Option<DateTime<Utc>>,
-}
-
-/// Internal key serialization.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Key {
-    Players,
-    Player {
-        user_login: String,
-    },
-    Connection {
-        user_id: String,
-        id: String,
-    },
-    ConnectionsByUserId {
-        user_id: String,
-    },
-    UserIdToKey {
-        user_id: String,
-    },
-    KeyToUserId {
-        key: String,
-    },
-    /// User data.
-    User {
-        user_id: String,
-    },
-    /// The latest github release for the given project
-    GithubReleases {
-        user: String,
-        repo: String,
-    },
-    /// Key from unsupported namespace.
-    Unsupported(String, Vec<serde_cbor::Value>),
 }
 
 impl Key {
@@ -139,9 +104,9 @@ impl<'de> serde::Deserialize<'de> for Key {
                 };
 
                 let key = match ns.as_str() {
-                    "player" => match visitor.next_element::<String>()? {
-                        Some(user_login) => Key::Player { user_login },
-                        None => Key::Players,
+                    "requester" => match visitor.next_element::<String>()? {
+                        Some(user_login) => Key::Requester { user_login },
+                        None => Key::Requesters,
                     },
                     "connections" => {
                         let user_id = visitor
@@ -174,7 +139,7 @@ impl<'de> serde::Deserialize<'de> for Key {
 
                         Key::User { user_id }
                     }
-                    "github-releases" => {
+                    "requester-releases" => {
                         let user = visitor
                             .next_element::<String>()?
                             .ok_or_else(|| Error::custom("expected: user"))?;
@@ -183,7 +148,7 @@ impl<'de> serde::Deserialize<'de> for Key {
                             .next_element::<String>()?
                             .ok_or_else(|| Error::custom("expected: repo"))?;
 
-                        Key::GithubReleases { user, repo }
+                        Key::requesterReleases { user, repo }
                     }
                     _ => {
                         let mut args = Vec::new();
@@ -212,11 +177,11 @@ impl serde::Serialize for Key {
         let mut seq = serializer.serialize_seq(None)?;
 
         match self {
-            Self::Players => {
-                seq.serialize_element("player")?;
+            Self::Requesters => {
+                seq.serialize_element("Requester")?;
             }
-            Self::Player { ref user_login } => {
-                seq.serialize_element("player")?;
+            Self::Requester { ref user_login } => {
+                seq.serialize_element("Requester")?;
                 seq.serialize_element(user_login)?;
             }
             Self::Connection {
@@ -243,11 +208,6 @@ impl serde::Serialize for Key {
                 seq.serialize_element("user")?;
                 seq.serialize_element(user_id)?;
             }
-            Self::GithubReleases { ref repo, ref user } => {
-                seq.serialize_element("github-releases")?;
-                seq.serialize_element(repo)?;
-                seq.serialize_element(user)?;
-            }
             Self::Unsupported(ref ns, ref args) => {
                 seq.serialize_element(ns)?;
 
@@ -273,8 +233,8 @@ impl Database {
     }
 
     /// Get information on the given user.
-    pub fn list_players(&self) -> Result<Vec<PlayerEntry>> {
-        let key = Key::Players.serialize()?;
+    pub fn list_Requesters(&self) -> Result<Vec<RequesterEntry>> {
+        let key = Key::Requesters.serialize()?;
         let prefix = &key[..(key.len() - 1)];
 
         let mut out = Vec::new();
@@ -283,9 +243,9 @@ impl Database {
             let (key, value) = result?;
 
             match Key::deserialize(key.as_ref())? {
-                Key::Player { ref user_login } => {
-                    if let Some(partial) = Self::deserialize::<PlayerPartial>(&value).ok() {
-                        out.push(PlayerEntry {
+                Key::Requester { ref user_login } => {
+                    if let Some(partial) = Self::deserialize::<RequesterPartial>(&value).ok() {
+                        out.push(RequesterEntry {
                             user_login: user_login.to_string(),
                             last_update: partial.last_update,
                         });
@@ -298,27 +258,27 @@ impl Database {
         return Ok(out);
 
         #[derive(Debug, Deserialize, Serialize)]
-        pub struct PlayerPartial {
+        pub struct RequesterPartial {
             pub last_update: Option<DateTime<Utc>>,
         }
     }
 
-    /// Get data for a single player.
-    pub fn get_player(&self, user_login: &str) -> Result<Option<Player>> {
-        let key = Key::Player {
+    /// Get data for a single Requester.
+    pub fn get_Requester(&self, user_login: &str) -> Result<Option<Requester>> {
+        let key = Key::Requester {
             user_login: user_login.to_string(),
         };
 
-        self.get::<Player>(&key)
+        self.get::<Requester>(&key)
     }
 
-    /// Get data for a single player.
-    pub fn insert_player(&self, user_login: &str, player: Player) -> Result<()> {
-        let key = Key::Player {
+    /// Get data for a single Requester.
+    pub fn insert_Requester(&self, user_login: &str, Requester: Requester) -> Result<()> {
+        let key = Key::Requester {
             user_login: user_login.to_string(),
         };
 
-        self.insert(&key, player)
+        self.insert(&key, Requester)
     }
 
     /// Get information on the given user.
@@ -469,13 +429,13 @@ impl Database {
         Ok(out)
     }
 
-    /// Get all github releases associated with the specified repository.
-    pub fn get_github_releases(
+    /// Get all requester releases associated with the specified repository.
+    pub fn get_requester_releases(
         &self,
         user: &str,
         repo: &str,
-    ) -> Result<Option<Vec<api::github::Release>>> {
-        let key = Key::GithubReleases {
+    ) -> Result<Option<Vec<api::pdf::Release>>> {
+        let key = Key::requesterReleases {
             user: user.to_string(),
             repo: repo.to_string(),
         };
@@ -483,14 +443,14 @@ impl Database {
         self.get(&key)
     }
 
-    /// Write the current github releases.
-    pub fn write_github_releases(
+    /// Write the current requester releases.
+    pub fn write_requester_releases(
         &self,
         user: &str,
         repo: &str,
-        releases: Vec<api::github::Release>,
+        releases: Vec<api::pdf::Release>,
     ) -> Result<()> {
-        let key = Key::GithubReleases {
+        let key = Key::requesterReleases {
             user: user.to_string(),
             repo: repo.to_string(),
         };
@@ -615,7 +575,7 @@ mod tests {
     fn test_subset() -> Result<()> {
         let a = Key::Connection {
             user_id: "100292".to_string(),
-            id: "twitch".to_string(),
+            id: "PDF".to_string(),
         };
 
         let a_bytes = a.serialize()?;

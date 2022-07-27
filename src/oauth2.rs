@@ -156,14 +156,8 @@ pub struct ExchangeToken {
 
 #[derive(Clone, Debug, Copy, Serialize, Deserialize)]
 pub enum FlowType {
-    #[serde(rename = "twitch")]
-    Twitch,
-    #[serde(rename = "youtube")]
-    YouTube,
-    #[serde(rename = "nightbot")]
-    Nightbot,
-    #[serde(rename = "spotify")]
-    Spotify,
+    #[serde(rename = "bot")]
+    BOT,
 }
 
 #[derive(Debug)]
@@ -239,20 +233,8 @@ impl Flow {
         }
 
         match self.config.ty {
-            FlowType::Twitch => {
-                self.exchange_received_code::<TwitchToken>(received_token.code)
-                    .await
-            }
-            FlowType::YouTube => {
-                self.exchange_received_code::<StandardToken>(received_token.code)
-                    .await
-            }
-            FlowType::Nightbot => {
-                self.exchange_received_code::<StandardToken>(received_token.code)
-                    .await
-            }
-            FlowType::Spotify => {
-                self.exchange_received_code::<StandardToken>(received_token.code)
+            FlowType::Bot => {
+                self.exchange_received_code::<BOTToken>(received_token.code)
                     .await
             }
         }
@@ -315,19 +297,7 @@ impl Flow {
         refresh_token: &RefreshToken,
     ) -> Result<SavedToken, RequestTokenError> {
         match self.config.ty {
-            FlowType::Twitch => self.refresh_token_inner::<TwitchToken>(refresh_token).await,
-            FlowType::YouTube => {
-                self.refresh_token_inner::<StandardToken>(refresh_token)
-                    .await
-            }
-            FlowType::Nightbot => {
-                self.refresh_token_inner::<StandardToken>(refresh_token)
-                    .await
-            }
-            FlowType::Spotify => {
-                self.refresh_token_inner::<StandardToken>(refresh_token)
-                    .await
-            }
+            FlowType::BOT => self.refresh_token_inner::<BOTToken>(refresh_token).await,
         }
     }
 
@@ -370,7 +340,7 @@ impl Flow {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct TwitchToken {
+pub struct BOTToken {
     access_token: AccessToken,
     token_type: TokenType,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -383,7 +353,7 @@ pub struct TwitchToken {
     scopes: Option<Vec<Scope>>,
 }
 
-impl Token for TwitchToken {
+impl Token for BOTToken {
     fn access_token(&self) -> &AccessToken {
         &self.access_token
     }

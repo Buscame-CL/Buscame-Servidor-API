@@ -2,3 +2,5 @@
 /db.*/
 /config.toml
 /node_modules/
+.history
+/target

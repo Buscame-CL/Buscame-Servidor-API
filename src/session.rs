@@ -14,7 +14,7 @@ pub struct Config {
 
 #[derive(Serialize, Deserialize)]
 pub struct SessionData {
-    /// Twitch user id.
+    /// Requester user id.
     pub user_id: String,
 }
 
