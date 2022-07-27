@@ -41,8 +41,6 @@ macro_rules! log_error {
     }}
 }
 
-static SPOTIFY_TRACK_URL: &str = "https://open.spotify.com/track";
-
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
     #[serde(default)]
@@ -211,8 +209,8 @@ pub struct Handler {
     config: Config,
     session: session::Session,
     fallback: Cow<'static, [u8]>,
-    id_twitch_client: api::IdTwitchClient,
-    spotify: api::Spotify,
+    id_Requester_client: api::IdRequesterClient,
+    Client: api::Client,
     login_flow: Arc<oauth2::Flow>,
     flows: HashMap<String, Arc<oauth2::Flow>>,
     pending_tokens: Arc<Mutex<HashMap<State, PendingToken>>>,
@@ -236,8 +234,8 @@ impl Handler {
             config,
             session,
             fallback,
-            id_twitch_client: api::IdTwitchClient::new()?,
-            spotify: api::Spotify::new()?,
+            id_Requester_client: api::IdRequesterClient::new()?,
+            Client: api::Client::new()?,
             login_flow,
             flows,
             pending_tokens,
@@ -319,8 +317,8 @@ impl Handler {
                     drop(path);
                     self.update_player(&mut req).await
                 }
-                (&Method::GET, &["github-releases", user, repo]) => {
-                    self.get_github_releases(user, repo).await
+                (&Method::GET, &["PDF-releases", user, repo]) => {
+                    self.get_PDF_releases(user, repo).await
                 }
                 _ => Err(Error::NotFound),
             },
@@ -800,7 +798,7 @@ impl Handler {
 
         let (return_to, connected) = match action {
             Action::RegisterOrLogin(action) => {
-                let result = self.auth_twitch_token(&token.access_token).await?;
+                let result = self.auth_Requester_token(&token.access_token).await?;
 
                 self.db.add_connection(
                     &result.user_id,
@@ -915,15 +913,15 @@ impl Handler {
     /// Handle a playlist update.
     async fn update_player(&self, req: &mut Request<Body>) -> Result<Response<Body>, Error> {
         let user = self.session.verify(req)?;
-        let twitch_token = extract_twitch_token(req);
+        let Requester_token = extract_Requester_token(req);
         let update = receive_json::<PlayerUpdate>(req, Self::MAX_BYTES);
 
         // NB: need to support special case for backwards compatibility.
         let (login, update) = match user {
             Some(user) => (user.login, update.await?),
             None => {
-                let token = twitch_token.ok_or_else(|| Error::Unauthorized)?;
-                let (auth, update) = tokio::try_join!(self.auth_twitch_token(&token), update)?;
+                let token = Requester_token.ok_or_else(|| Error::Unauthorized)?;
+                let (auth, update) = tokio::try_join!(self.auth_Requester_token(&token), update)?;
                 (auth.login, update)
             }
         };
@@ -954,7 +952,7 @@ impl Handler {
             items: Vec<Item>,
         }
 
-        fn extract_twitch_token<B>(req: &Request<B>) -> Option<String> {
+        fn extract_Requester_token<B>(req: &Request<B>) -> Option<String> {
             let header = match req.headers().get(header::AUTHORIZATION) {
                 Some(auth) => auth,
                 None => return None,
@@ -974,9 +972,9 @@ impl Handler {
         }
     }
 
-    /// Get the latest known github releases for the specified user/repo combo.
-    async fn get_github_releases(&self, user: &str, repo: &str) -> Result<Response<Body>, Error> {
-        let releases = match self.db.get_github_releases(user, repo)? {
+    /// Get the latest known PDF releases for the specified user/repo combo.
+    async fn get_PDF_releases(&self, user: &str, repo: &str) -> Result<Response<Body>, Error> {
+        let releases = match self.db.get_PDF_releases(user, repo)? {
             Some(releases) => releases,
             None => return Err(Error::NotFound),
         };
@@ -985,9 +983,9 @@ impl Handler {
     }
 
     /// Test for authentication, if enabled.
-    async fn auth_twitch_token(&self, token: &str) -> Result<api::twitch::ValidateToken, Error> {
+    async fn auth_Requester_token(&self, token: &str) -> Result<api::Requester::ValidateToken, Error> {
         Ok(self
-            .id_twitch_client
+            .id_Requester_client
             .validate_token(token)
             .await
             .map_err(Error::Error)?)
@@ -1000,16 +998,16 @@ impl Handler {
         token: &oauth2::SavedToken,
     ) -> Result<serde_cbor::Value, anyhow::Error> {
         return match flow.config.ty {
-            oauth2::FlowType::Twitch => {
+            oauth2::FlowType::Requester => {
                 let result = self
-                    .id_twitch_client
+                    .id_Requester_client
                     .validate_token(&token.access_token)
                     .await?;
 
                 Ok(serde_cbor::value::to_value(&result)?)
             }
-            oauth2::FlowType::Spotify => {
-                let result = self.spotify.v1_me(&token.access_token).await?;
+            oauth2::FlowType::Client => {
+                let result = self.Client.v1_me(&token.access_token).await?;
                 Ok(serde_cbor::value::to_value(&result)?)
             }
             _ => Ok(serde_cbor::value::to_value(&Empty {})?),
@@ -1069,7 +1067,7 @@ pub struct Item {
     artists: Option<String>,
     /// The URL of a track.
     track_url: Option<String>,
-    /// Spotify ID of the song.
+    /// Client ID of the song.
     track_id: String,
     /// User who requested the song.
     #[serde(default)]
@@ -1087,7 +1085,7 @@ impl Item {
             artists: self.artists,
             track_url: self
                 .track_url
-                .unwrap_or_else(|| format!("{}/{}", SPOTIFY_TRACK_URL, track_id)),
+                .unwrap_or_else(|| format!("{}/{}", Client_TRACK_URL, track_id)),
             user: self.user,
             duration: self.duration,
         }

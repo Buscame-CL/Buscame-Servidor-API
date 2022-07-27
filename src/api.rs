@@ -4,11 +4,11 @@ use anyhow::bail;
 use bytes::Bytes;
 use reqwest::{header, Client, Method, Url};
 
-pub mod github;
+pub mod pdf;
 pub mod spotify;
 pub mod twitch;
 
-pub use self::github::GitHub;
+pub use self::pdf::GitHub;
 pub use self::spotify::Spotify;
 pub use self::twitch::IdTwitchClient;
 

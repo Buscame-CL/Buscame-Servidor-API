@@ -3,19 +3,19 @@ use anyhow::Error;
 use chrono::{DateTime, Utc};
 use reqwest::{Client, Method, Url};
 
-const API_URL: &str = "https://api.github.com";
+const API_URL: &str = "https://api-buscame.vercel.app/generador-pdf";
 
 /// API integration.
 #[derive(Clone, Debug)]
-pub struct GitHub {
+pub struct PDF {
     client: Client,
     api_url: Url,
 }
 
-impl GitHub {
+impl PDF {
     /// Create a new API integration.
-    pub fn new() -> Result<GitHub, Error> {
-        Ok(GitHub {
+    pub fn new() -> Result<PDF, Error> {
+        Ok(PDF {
             client: Client::new(),
             api_url: str::parse::<Url>(API_URL)?,
         })
